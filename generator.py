@@ -1,51 +1,96 @@
 import random
 
-r, c, n = map(int, input().split())
+class NonogramGenerator:
+    def __init__(self, row_size, col_size):
+        self.row_size = row_size
+        self.col_size = col_size
+        self.solution = None
+        self.row_hint = None
+        self.col_hint = None
+        
+    def generate_solution(self):
+        board = [[0] * self.col_size for _ in range(self.row_size)]
+        total_count = self.row_size * self.col_size
+        filled_ratio = 0.4
+        target_count = int(total_count * filled_ratio)
+        filled_count = 0
+        empty_count = 0
+        border = set()
+        
+        random.seed()
+        start_row, start_col = random.randint(0, self.row_size - 1), random.randint(0, self.col_size - 1)
+        board[start_row][start_col] = 1
+        filled_count += 1
+        
+        for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            r, c = start_row + dr, start_col + dc
+            if 0 <= r < self.row_size and 0 <= c < self.col_size:
+                border.add((r, c))
+                
+        while filled_count < target_count:
+            if not border:
+                print("Warning: Frontier exhausted. Restarting solution generation...")
+                # return self.generate_random_solution()
 
-def get_hint(line):
-    hint = []
-    count = 0
-    for entry in line:
-        if entry == 1:
-            count += 1
-        elif count > 0:
-            hint.append(count)
-            count = 0
-    if count > 0: hint.append(count)
-    return hint if len(hint) > 0 else [0]
-
-with open('nonogram_problems.txt', 'w') as file:
-    for _ in range(n):
-        answer = [[random.choice([-1, 1]) for _ in range(c)] for _ in range(r)]
-        rows = [get_hint(row) for row in answer]
-        cols = [get_hint(col) for col in zip(*answer)]
+            if (target_count + empty_count) == total_count:
+                # Make all remaining cells to be filled.
+                board = [[1 if cell == 0 else cell for cell in row] for row in board]
+                    
+                
+            border_ratio = (len(border) ** 2 - 1) / (self.row_size * self.col_size)
+            progress = filled_count / target_count
+            fill_prob = 1.0 - border_ratio * progress
+            
+            r, c = random.choice(list(border))
+            print(f"위치: ({r}, {c}), 칠해질 확률: {fill_prob}")
+            if random.random() < fill_prob:
+                board[r][c] = 1
+                filled_count += 1
+                border.remove((r, c))
+            
+                for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < self.row_size and 0 <= nc < self.col_size:
+                        if board[nr][nc] == 0:
+                            border.add((nr, nc))
+            else:
+                board[r][c] = -1
+                empty_count += 1
+                border.remove((r, c))
+                       
+            print('Filled:', filled_count) 
+            for r, row in enumerate(board):
+                print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row]))
+            input()
+            
+        board = [[-1 if cell == 0 else cell for cell in row] for row in board]
+        self.solution = board
         
-        for hint in rows:
-            file.write('[')
-            for i, num in enumerate(hint):
-                if i < len(hint) - 1:
-                    file.write(f"{num}, ")
-                else:
-                    file.write(f"{num}")
-            file.write(']')
-        file.write('\n')
-        
-        for hint in cols:
-            file.write('[')
-            for i, num in enumerate(hint):
-                if i < len(hint) - 1:
-                    file.write(f"{num}, ")
-                else:
-                    file.write(f"{num}")
-            file.write(']')
-        file.write('\n')
-        
-        for row in answer:
-            file.write('[')
-            for i, entry in enumerate(row):
-                if i < len(row) - 1:
-                    file.write(f"{entry}, ")
-                else:
-                    file.write(f"{entry}")
-            file.write(']')
-        file.write('\n')
+    def _get_hint_from_line(self, line):
+        hint = []
+        count = 0
+        for entry in line:
+            if entry == 1:
+                count += 1
+            elif count > 0:
+                hint.append(count)
+                count = 0
+        if count > 0: hint.append(count)
+        return hint if len(hint) > 0 else [0]
+    
+    def get_hints(self):
+        self.row_hint = [self._get_hint_from_line(row) for row in self.solution]
+        self.col_hint = [self._get_hint_from_line(col) for col in zip(*self.solution)]
+        return self.row_hint, self.col_hint
+    
+    def print_solution(self):
+        for r, row in enumerate(self.solution):
+            hint_str = str(self.row_hint[r]).rjust(30)
+            print(hint_str, end=' ')
+            print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row]))
+       
+# test 
+generator = NonogramGenerator(10, 10)
+generator.generate_solution()
+generator.get_hints()
+generator.print_solution()
