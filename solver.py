@@ -21,7 +21,7 @@ class NonogramSolver:
         self.board = [[0] * self.col_size] * self.row_size
         
     def fill_line(self, hint, line):
-        # 1단계: 모든 행과 열에 대해 교차점 알고리즘을 적용하여 확정되는 칸을 최대한 채운다.
+        """모든 행과 열에 대해 교차점 알고리즘을 적용하여 확정되는 칸을 최대한 채운다."""
         require = sum(hint) + len(hint) - 1
         length = len(line)
         new_line = line[:]
@@ -36,7 +36,7 @@ class NonogramSolver:
         return new_line
     
     def match_hint(self, hint, line):
-        # 주어진 line이 hint를 만족하는지 확인한다.
+        """주어진 line이 hint를 만족하는지 확인한다."""
         groups = []
         count = 0
         for entry in line:
@@ -50,7 +50,7 @@ class NonogramSolver:
         return groups == hint
     
     def is_correct(self):
-        # 현재 board 상태가 hint를 만족하는지 확인한다.
+        """현재 board 상태가 hint를 만족하는지 확인한다."""
         row_hint = self.row_hint
         col_hint = self.col_hint
         board = self.board
@@ -64,50 +64,87 @@ class NonogramSolver:
                 return False
         return True
     
-    def solvable(self, hint, line):
-        # 현재 line에서 아직 정해지지 않은 빈칸(0)들을 채우는 모든 경우를
-        # 백트래킹으로 탐색하여 hint를 만족하는 해가 존재하는지 확인한다.
-        # ex) hint = [2, 1] 이고, line = [0 -1 0 0 0] 이면 hint를 만족하는 경우가 존재하지 않으므로 False
+    def get_all_solutions(self, length, hint):
+        """
+        주어진 힌트를 만족하는 모든 가능한 row를 반환한다.
+
+        Args:
+            row_length (int): 줄의 길이.
+            hints (list): 연속된 칠해진 칸의 길이를 나타내는 힌트.
+
+        Returns:
+            list: 가능한 모든 줄의 리스트.
+        """
         
-        length = len(line)
-        empty_list = [i for i in range(length) if line[i] == 0]
-        new_line = line[:] 
-        def backtrack(index):
-            if index == len(empty_list):
-                return self.match_hint(hint, new_line)
+        results = []
+
+        def find_solutions(current_row, hint_index, row_index):
+            # 성공 조건: 모든 힌트를 사용했고, 줄의 끝에 도달함
+            if hint_index == len(hint):
+                results.append(current_row[:])
+                return
+
+            # 실패 조건: 줄의 끝을 넘어감
+            if row_index >= length:
+                return
+
+            # 현재 힌트를 적용할 수 있는 경우
+            hint_size = hint[hint_index]
             
-            i = empty_list[index]
-            new_line[i] = 1
-            if backtrack(index + 1):
-                return True
-            new_line[i] = -1
-            if backtrack(index + 1):
-                return True
-            return False
-        
-        return backtrack(0)
+            # 1. 현재 위치에서 블록을 놓는 경우
+            if row_index + hint_size <= length:
+                # 다음 힌트와의 간격을 고려하여 블록을 놓을 수 있는지 확인
+                # 블록 뒤에 적어도 하나의 공백이 필요
+                temp_row = current_row[:]
+                for i in range(hint_size):
+                    temp_row[row_index + i] = 1
+                find_solutions(temp_row, hint_index + 1, row_index + hint_size + 1)
+
+            # 2. 현재 위치를 건너뛰는 경우
+            find_solutions(current_row, hint_index, row_index + 1)
+
+        initial_row = [-1] * length
+        find_solutions(initial_row, 0, 0)
+                
+        return results
+            
     
     def infer(self, hint, line):
-        # 현재 line에서 모든 빈칸(0)에 대해 임시로 칠하거나(1) 비우고(-1),
-        # 이 상태에서 해가 존재하는지 solvable 함수로 확인한다.
-        # 만약 해가 존재하지 않는다면 해당 칸은 확정적으로 비어있거나 칠해진다.
+        """
+        hint로부터 가능한 모든 줄의 상태를 얻고, 그 중 현재 line을 만족하는 줄들만 남긴다.
+        현재 line을 만족하는 solution들로부터 공통된 칸들을 찾아 추가적인 정보를 반영한 new_line을 반환한다.
+        """
         
         length = len(line)
-        empty_list = [i for i in range(length) if line[i] == 0]
+        solutions = self.get_all_solutions(length, hint)
+        
+        possible_solutions = []
+        for solution in solutions:
+            is_match = True
+            # 현재 줄의 상태를 순회하며 각 해답과 비교
+            for i in range(length):
+                # 미확정 상태(0)가 아닌 경우에만 비교
+                if line[i] != 0 and line[i] != solution[i]:
+                    is_match = False
+                    break # 일치하지 않으면 다음 해답으로
+            
+            if is_match:
+                possible_solutions.append(solution)
+        
         new_line = line[:]
-        for i in empty_list:
-            new_line[i] = 1
-            if not self.solvable(hint, new_line):
-                new_line[i] = -1
-                continue
-            
-            new_line[i] = -1
-            if not self.solvable(hint, new_line):
-                new_line[i] = 1
-                continue
-            new_line[i] = 0
-            
-            
+        for i in range(length):
+            if line[i] == 0:
+                value = possible_solutions[0][i]
+                is_common = True
+                
+                for solution in possible_solutions[1:]:
+                    if solution[i] != value:
+                        is_common = False
+                        break
+                    
+                if is_common:
+                    new_line[i] = value
+
         return new_line
         
     def solve_problem(self):
@@ -128,9 +165,12 @@ class NonogramSolver:
         print("Fill line: col")
         self.print_board()
 
+        # Infer 단계
         while True:
             count += 1
             print("Iteration:", count)
+            
+            prev_board = [row[:] for row in board]
             
             for r in range(self.col_size):
                 temp = self.infer(row_hint[r], board[r])
@@ -141,17 +181,9 @@ class NonogramSolver:
                     board[r][c] = temp[r]
             
             self.print_board()
-            if self.is_correct() or count >= 10:
+            if self.is_correct():
+                print("Problem solved!")
                 break
-
-## Test ##
-nonoSolver = NonogramSolver()
-'''nonoSolver.set_problem(
-[[1, 6, 5], [1, 1, 2, 1], [1, 1, 8], [1, 1, 2, 4], [1, 2, 3, 2], [1, 1, 1, 1, 2, 1, 1], [4, 3, 2, 2], [2, 1, 1], [1, 1, 1, 3], [2, 1, 1, 1, 4], [1, 1, 2, 2], [1, 3, 2], [2, 1, 5, 1], [1, 4, 3, 1], [1, 1, 1, 1, 1, 1]],
-[[1, 3, 1, 4, 1], [1, 2, 1], [1, 2, 1, 1, 3], [2, 3, 1], [1, 1, 3, 2], [1, 4, 1, 1], [1, 1, 1, 1, 2, 2], [1, 1, 2, 1, 2], [2, 1, 1, 4], [2, 3, 3, 1], [1, 1, 3, 1, 3], [1, 2, 3, 2], [1, 2, 1, 2, 4], [1, 3, 1, 1, 1], [2, 4, 1, 2]]
-)'''
-nonoSolver.solve_problem()
-
-# infer test
-#print(nonoSolver.infer([4], [0,0,0,0,0]))
-#print(nonoSolver.solvable([1, 2], [0,0,0,-1,0]))
+            if prev_board == board:
+                print("Cannot solve the problem.")
+                break

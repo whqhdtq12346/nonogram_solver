@@ -11,7 +11,7 @@ class NonogramGenerator:
     def generate_solution(self):
         board = [[0] * self.col_size for _ in range(self.row_size)]
         total_count = self.row_size * self.col_size
-        filled_ratio = 0.4
+        filled_ratio = 0.5
         target_count = int(total_count * filled_ratio)
         filled_count = 0
         empty_count = 0
@@ -42,7 +42,7 @@ class NonogramGenerator:
             fill_prob = 1.0 - border_ratio * progress
             
             r, c = random.choice(list(border))
-            print(f"위치: ({r}, {c}), 칠해질 확률: {fill_prob}")
+            # print(f"위치: ({r}, {c}), 칠해질 확률: {fill_prob}")
             if random.random() < fill_prob:
                 board[r][c] = 1
                 filled_count += 1
@@ -57,14 +57,18 @@ class NonogramGenerator:
                 board[r][c] = -1
                 empty_count += 1
                 border.remove((r, c))
-                       
+            
+            '''           
             print('Filled:', filled_count) 
             for r, row in enumerate(board):
                 print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row]))
             input()
+            '''
             
         board = [[-1 if cell == 0 else cell for cell in row] for row in board]
         self.solution = board
+        self.row_hint = [self._get_hint_from_line(row) for row in self.solution]
+        self.col_hint = [self._get_hint_from_line(col) for col in zip(*self.solution)]
         
     def _get_hint_from_line(self, line):
         hint = []
@@ -79,8 +83,6 @@ class NonogramGenerator:
         return hint if len(hint) > 0 else [0]
     
     def get_hints(self):
-        self.row_hint = [self._get_hint_from_line(row) for row in self.solution]
-        self.col_hint = [self._get_hint_from_line(col) for col in zip(*self.solution)]
         return self.row_hint, self.col_hint
     
     def print_solution(self):
@@ -88,9 +90,3 @@ class NonogramGenerator:
             hint_str = str(self.row_hint[r]).rjust(30)
             print(hint_str, end=' ')
             print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row]))
-       
-# test 
-generator = NonogramGenerator(10, 10)
-generator.generate_solution()
-generator.get_hints()
-generator.print_solution()
