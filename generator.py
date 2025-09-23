@@ -1,20 +1,23 @@
 import random
+from solver import NonogramSolver
 
 class NonogramGenerator:
-    def __init__(self, row_size, col_size):
+    def __init__(self, row_size, col_size, fill_ratio):
         self.row_size = row_size
         self.col_size = col_size
         self.solution = None
         self.row_hint = None
         self.col_hint = None
+        self.fill_ratio = fill_ratio
         
     def generate_solution(self):
+        print("Generating the problem...")
         board = [[0] * self.col_size for _ in range(self.row_size)]
         total_count = self.row_size * self.col_size
-        filled_ratio = 0.5
-        target_count = int(total_count * filled_ratio)
-        filled_count = 0
-        empty_count = 0
+        
+        target_count = int(total_count * self.fill_ratio)
+        filled_count = 0 # 칠해진 칸(1) 수
+        empty_count = 0 # 칠해지지 않은 칸(-1) 수
         border = set()
         
         random.seed()
@@ -28,14 +31,10 @@ class NonogramGenerator:
                 border.add((r, c))
                 
         while filled_count < target_count:
-            if not border:
-                print("Warning: Frontier exhausted. Restarting solution generation...")
-                # return self.generate_random_solution()
-
-            if (target_count + empty_count) == total_count:
-                # Make all remaining cells to be filled.
+            # 남아있는 칸 수가 더 칠해야 할 칸 수와 같을 경우, 남은 칸들을 모두 칠하고 종료
+            if total_count - empty_count == target_count:
                 board = [[1 if cell == 0 else cell for cell in row] for row in board]
-                    
+                break
                 
             border_ratio = (len(border) ** 2 - 1) / (self.row_size * self.col_size)
             progress = filled_count / target_count
@@ -43,6 +42,7 @@ class NonogramGenerator:
             
             r, c = random.choice(list(border))
             # print(f"위치: ({r}, {c}), 칠해질 확률: {fill_prob}")
+            
             if random.random() < fill_prob:
                 board[r][c] = 1
                 filled_count += 1
@@ -58,17 +58,27 @@ class NonogramGenerator:
                 empty_count += 1
                 border.remove((r, c))
             
-            '''           
+            '''        
             print('Filled:', filled_count) 
             for r, row in enumerate(board):
                 print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row]))
             input()
             '''
             
+            
         board = [[-1 if cell == 0 else cell for cell in row] for row in board]
         self.solution = board
         self.row_hint = [self._get_hint_from_line(row) for row in self.solution]
         self.col_hint = [self._get_hint_from_line(col) for col in zip(*self.solution)]
+        
+        # 생성한 퍼즐이 유일해를 갖는지 확인
+        solver = NonogramSolver()
+        solver.set_problem(self.row_hint, self.col_hint)
+        if not solver.solve_problem(log=False):
+            return self.generate_solution()
+        else:
+            d = solver.difficulty
+            print(f"Problem with difficulty {d} generated!")
         
     def _get_hint_from_line(self, line):
         hint = []
