@@ -1,40 +1,55 @@
 class NonogramSolver:
     def __init__(self):
-        self.row_size = 5   # 행 개수
-        self.col_size = 5   # 열 개수
+        self.row_num = 5   # 행 개수
+        self.col_num = 5   # 열 개수
         self.row_hint = [[1, 3], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 3]]
         self.col_hint = [[5], [0], [5], [1, 1], [5]]
-        self.board = [[0 for _ in range(self.col_size)] for _ in range(self.row_size)]
+        self.board = [[0 for _ in range(self.col_num)] for _ in range(self.row_num)]
+        self.row_solutions = [[] for _ in range(self.row_num)]
+        self.col_solutions = [[] for _ in range(self.col_num)]
         self.difficulty = 0
         
     def print_board(self):
         board = self.board
         for r, row in enumerate(board):
-            hint_str = str(self.row_hint[r]).rjust(30)
+            hint_str = str(self.row_hint[r]).rjust(int(1.5 * self.col_num))
             print(hint_str, end=' ')
             print(''.join(['■' if val == 1 else '□' if val == -1 else '?' for val in row])) 
     
     def set_problem(self, row_hint, col_hint):
-        self.row_size = len(row_hint)
-        self.col_size = len(col_hint)
+        self.row_num = len(row_hint)
+        self.col_num = len(col_hint)
         self.row_hint = row_hint
         self.col_hint = col_hint
-        self.board = [[0 for _ in range(self.col_size)] for _ in range(self.row_size)]
-        print(f"Set the Problem with Row: {self.row_size}, Col: {self.col_size}")
+        self.board = [[0 for _ in range(self.col_num)] for _ in range(self.row_num)]
+        self.row_solutions = [[] for _ in range(self.row_num)]
+        self.col_solutions = [[] for _ in range(self.col_num)]
+        print(f"Set the Problem with Row: {self.row_num}, Col: {self.col_num}")
         
     def _fill_line(self, hint, line):
         """모든 행과 열에 대해 교차점 알고리즘을 적용하여 확정되는 칸을 채운다."""
-        require = sum(hint) + len(hint) - 1
         length = len(line)
+        if hint == [0]:
+            return [-1 for _ in range(length)]
+        
+        # 시작 또는 끝 부분에 [0]으로 인해 사라진 line이 있을 경우 그 부분을 제외
+        start = 0
+        while line[start] == -1:
+            start += 1
+        end = length
+        while line[end-1] == -1:
+            end -= 1
+        length = end - start 
+        
+        require = sum(hint) + len(hint) - 1
         new_line = line[:]
         if require <= length:
             diff = length - require
-            pr = 0
             for term in hint:
                 if term > diff:
-                    for i in range(pr + diff, pr + term):
+                    for i in range(start + diff, start + term):
                         new_line[i] = 1
-                pr += term + 1
+                start += term + 1
         return new_line
     
     def _match_hint(self, hint, line):
@@ -57,86 +72,94 @@ class NonogramSolver:
         col_hint = self.col_hint
         board = self.board
         
-        for r in range(self.col_size):
+        for r in range(self.row_num):
             if not self._match_hint(row_hint[r], board[r]):
                 return False
-        for c in range(self.row_size):
-            col = [board[r][c] for r in range(self.row_size)]
+        for c in range(self.col_num):
+            col = [board[r][c] for r in range(self.row_num)]
             if not self._match_hint(col_hint[c], col):
                 return False
         return True
     
-    def _get_all_solutions(self, length, hint):
-        """주어진 힌트를 만족하는 모든 가능한 line을 반환한다."""
+    def _get_all_solutions(self, length, hint, line):
+        """주어진 힌트(hint)와 현재 줄의 상태(line)를 만족하는 모든 가능한 solution을 반환한다."""
         
         results = []
 
         def find_solutions(current_line, hint_index, line_index):
             # 성공 조건: 모든 힌트를 사용했고, 줄의 끝에 도달함
             if hint_index == len(hint):
-                results.append(current_line[:])
+                # 남은 칸 중 1이 있는지 확인
+                is_valid = True
+                for i in range(line_index, length):
+                    if line[i] == 1:
+                        is_valid = False
+                        break
+                if is_valid:
+                    results.append(current_line[:])
                 return
 
-            # 실패 조건: 줄의 끝을 넘어감
+            # 실패 조건: 줄의 끝을 넘어갔거나, 기존 줄의 상태와 맞지 않을 경우
             if line_index >= length:
                 return
-
-            # 현재 힌트를 적용할 수 있는 경우
-            hint_size = hint[hint_index]
             
             # 1. 현재 위치에서 블록을 놓는 경우
+            hint_size = hint[hint_index]
             if line_index + hint_size <= length:
-                # 다음 힌트와의 간격을 고려하여 블록을 놓을 수 있는지 확인
-                # 블록 뒤에 적어도 하나의 공백이 필요
                 temp_line = current_line[:]
+                place = True
+                
+                # 블록 내에 확정된 -1이 있는지 확인
                 for i in range(hint_size):
-                    temp_line[line_index + i] = 1
-                find_solutions(temp_line, hint_index + 1, line_index + hint_size + 1)
+                    if line[line_index + i] == -1:
+                        place = False
+                        break
+                
+                # 블록 뒤에 -1이 올 수 있는지 확인
+                if line_index + hint_size < length and line[line_index + hint_size] == 1:
+                    place = False
+                
+                if place:
+                    for i in range(hint_size):
+                        temp_line[line_index + i] = 1
+                    find_solutions(temp_line, hint_index + 1, line_index + hint_size + 1)
 
             # 2. 현재 위치를 건너뛰는 경우
-            find_solutions(current_line, hint_index, line_index + 1)
+            # 현재 위치가 1로 확정되지 않았을 때만 가능
+            if line[line_index] != 1:
+                find_solutions(current_line, hint_index, line_index + 1)
 
         initial_row = [-1] * length
         find_solutions(initial_row, 0, 0)
                 
         return results
             
-    def _infer(self, hint, line):
+    def _infer(self, row, index):
         """
-        hint로부터 가능한 모든 줄의 상태를 얻고, 그 중 현재 line을 만족하는 줄들만 남긴다.
-        현재 line을 만족하는 solution들로부터 공통된 칸들을 찾아 추가적인 정보를 반영한 new_line을 반환한다.
+        Args:
+            row: 추론할 line이 가로줄이면 True, 세로줄이면 False
+            index: 추론할 line의 번호
+        대상 line의 현재 가능한 solution들의 집합으로부터 공통된 칸들을 찾아 추가적인 정보를 반영한 new_line을 반환한다.
         """
         
+        line = self.board[index] if row else [self.board[r][index] for r in range(self.row_num)]
         length = len(line)
-        solutions = self._get_all_solutions(length, hint)
-        
-        possible_solutions = []
-        for solution in solutions:
-            is_match = True
-            # 현재 줄의 상태를 순회하며 각 해답과 비교
-            for i in range(length):
-                # 미확정 상태(0)가 아닌 경우에만 비교
-                if line[i] != 0 and line[i] != solution[i]:
-                    is_match = False
-                    break # 일치하지 않으면 다음 해답으로
-            
-            if is_match:
-                possible_solutions.append(solution)
+        solutions = self.row_solutions[index] if row else self.col_solutions[index]
         
         new_line = line[:]
         for i in range(length):
             if line[i] == 0:
-                value = possible_solutions[0][i]
+                value = solutions[0][i]
                 is_common = True
                 
-                for solution in possible_solutions[1:]:
+                for solution in solutions[1:]:
                     if solution[i] != value:
                         is_common = False
                         break
                     
                 if is_common:
                     new_line[i] = value
-
+        
         return new_line
         
     def solve_problem(self, log=True):
@@ -145,44 +168,95 @@ class NonogramSolver:
         row_hint = self.row_hint
         col_hint = self.col_hint
         board = self.board
+        # 정보가 추가된 줄에 대해서만 infer를 수행
+        row_infer_list = [False for _ in range(self.row_num)]
+        col_infer_list = [False for _ in range(self.col_num)]
         
-        for r in range(self.col_size):
+        # [0] 처리 단계
+        for r in range(self.row_num):
+            if row_hint[r] == [0]:
+                board[r] = [-1 for _ in range(self.col_num)]
+        
+        for c in range(self.col_num):
+            if col_hint[c] == [0]:
+                for r in range(self.row_num):
+                    board[r][c] = -1
+        
+        # fill_line 단계
+        for r in range(self.row_num):
+            row = board[r]
             temp = self._fill_line(row_hint[r], board[r])
-            board[r] = temp
+            for c in range(self.col_num):
+                if temp[c] != row[c]:
+                    col_infer_list[c] = True
+                    board[r][c] = temp[c]
         if log:
             print("Fill line: row")
             self.print_board()
         
-        for c in range(self.row_size):
-            temp = self._fill_line(col_hint[c], [board[r][c] for r in range(self.row_size)])
-            for r in range(self.row_size):
-                board[r][c] = temp[r]
+        for c in range(self.col_num):
+            col = [board[r][c] for r in range(self.row_num)]
+            temp = self._fill_line(col_hint[c], col)
+            for r in range(self.row_num):
+                if temp[r] != col[r]:
+                    row_infer_list[r] = True
+                    board[r][c] = temp[r]
         if log:
             print("Fill line: col")
             self.print_board()
 
+        # infer 단계
         while True:
             count += 1
             prev_board = [row[:] for row in board]
             
-            for r in range(self.col_size):
-                temp = self._infer(row_hint[r], board[r])
-                board[r] = temp
-            for c in range(self.row_size):
-                temp = self._infer(col_hint[c], [board[r][c] for r in range(self.row_size)])
-                for r in range(self.row_size):
-                    board[r][c] = temp[r]
+            # Row infer
+            for r in range(self.row_num):
+                if not row_infer_list[r]:
+                    continue
+                
+                row = board[r]
+                self.row_solutions[r] = self._get_all_solutions(self.col_num, row_hint[r], row)
+                
+                temp = self._infer(row=True, index=r)
+                for c in range(self.col_num):
+                    if temp[c] != row[c]:
+                        col_infer_list[c] = True
+                        board[r][c] = temp[c]
+            row_infer_list = [False for _ in range(self.row_num)]
+            
+            # Column infer
+            for c in range(self.col_num):
+                if not col_infer_list[c]:
+                    continue
+                
+                col = [board[r][c] for r in range(self.row_num)]
+                self.col_solutions[c] = self._get_all_solutions(self.row_num, col_hint[c], col)
+                
+                temp = self._infer(row=False, index=c)
+                for r in range(self.row_num):
+                    if temp[r] != col[r]:
+                        row_infer_list[r] = True
+                        board[r][c] = temp[r]
+            col_infer_list = [False for _ in range(self.col_num)]
+            
             if log:
                 print("Iteration:", count)
                 self.print_board()
+                # input()
                 
             if self._is_correct():
                 print("Problem solved!")
                 self.difficulty = count
+                self.row_solutions = None
+                self.col_solutions = None
                 return True
             if prev_board == board:
                 print("Cannot solve the problem.")
                 self.difficulty = None
+                self.row_solutions = None
+                self.col_solutions = None
                 return False
+            
                 
         
