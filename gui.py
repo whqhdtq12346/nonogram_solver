@@ -21,10 +21,6 @@ font_22 = pygame.font.Font("font/NanumGothic.otf", 22)
 font_36 = pygame.font.Font("font/NanumGothic.otf", 36)
 
 
-
-# ================================================================
-# 메인 GUI 클래스
-# ================================================================
 class NonogramApp:
     def __init__(self):
         self.mode = "menu"  # "menu", "generator", "solver"
@@ -46,9 +42,6 @@ class NonogramApp:
         pygame.quit()
         sys.exit()
 
-    # =============================================================
-    # 메인 메뉴 화면
-    # =============================================================
     def show_main_menu(self):
         self.screen.fill(WHITE)
         scr_width, scr_height = self.screen.get_size()
@@ -56,7 +49,6 @@ class NonogramApp:
         title = font_36.render("Nonogram", True, BLACK)
         self.screen.blit(title, (scr_width // 2 - title.get_width() // 2, 150))
 
-        # 버튼 정의
         buttons = {
             "Generator": pygame.Rect(scr_width // 2 - BUTTON_WIDTH // 2, 250, BUTTON_WIDTH, BUTTON_HEIGHT),
             "Solver": pygame.Rect(scr_width // 2 - BUTTON_WIDTH // 2, 310, BUTTON_WIDTH, BUTTON_HEIGHT),
@@ -100,7 +92,7 @@ class NonogramApp:
             self.screen = pygame.display.set_mode((800, 600))
         return True
 
-    # Solver Mode 실행 (지금은 더미)
+    # Solver Mode 실행
     def run_solver_mode(self):
         if self.gui is None:
             self.gui = SolverGUI()

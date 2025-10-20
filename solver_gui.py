@@ -1,5 +1,9 @@
 import pygame
 import sys
+import os
+import threading
+import tkinter as tk
+from tkinter import filedialog
 from solver import NonogramSolver
 
 # 기본 설정
@@ -38,6 +42,9 @@ class InputBox:
                 self.text += '\n'
             elif event.key == pygame.K_BACKSPACE:
                 self.text = self.text[:-1]
+            elif event.key == pygame.K_SPACE and self.ori == 'vertical':
+                # 세로 힌트는 스페이스바 → 줄바꿈
+                self.text += '\n'
             else:
                 self.text += event.unicode
             self.txt_surface = self.font.render(self.text, True, BLACK)
@@ -76,6 +83,7 @@ class SolverGUI:
         self.col_hint = [[] for _ in range(self.cols)]
         self.board = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
         self.difficulty_value = None
+        self.file_path_holder = {"path": None}
         
         # GUI
         self.margin_left = 150
@@ -104,6 +112,7 @@ class SolverGUI:
 
         # 버튼 정의
         self.buttons = {
+            "Load": pygame.Rect(975, 250, 150, 40),
             "Solve": pygame.Rect(975, 300, 150, 40),
             "Reset": pygame.Rect(975, 350, 150, 40),
             "Back": pygame.Rect(975, 400, 150, 40),
@@ -180,7 +189,7 @@ class SolverGUI:
                 elif val == -1:
                     color = GRAY
                 pygame.draw.rect(self.screen, color, rect)
-                pygame.draw.rect(self.screen, BLACK, rect, 1)
+                pygame.draw.rect(self.screen, DARK_GRAY, rect, 1)
 
         # 5칸마다 굵은 선
         board_width = self.cols * self.cell_size
@@ -196,12 +205,13 @@ class SolverGUI:
 
         # 타이머
         if self.start_time is not None and self.timer_running:
-            self.elapsed_time = (pygame.time.get_ticks() - self.start_time) // 1000
+            self.elapsed_time = pygame.time.get_ticks() - self.start_time
         elif self.start_time is not None and not self.timer_running:
             pass
-        minutes = self.elapsed_time // 60
-        seconds = self.elapsed_time % 60
-        time_str = f"{minutes:02}:{seconds:02}"
+        minutes = self.elapsed_time // 60000
+        seconds = (self.elapsed_time // 1000) % 60
+        ms = self.elapsed_time % 1000
+        time_str = f"{minutes:02}:{seconds:02}:{ms:03}"
         time_surface = font_22.render(f"Time : {time_str}", True, BLACK)
         time_rect = time_surface.get_rect(center=(1050, 60))
         self.screen.blit(time_surface, time_rect)
@@ -223,34 +233,106 @@ class SolverGUI:
             
         # 메시지
         if self.message and pygame.time.get_ticks() - self.message_timer < 3000:
-            msg_surface = font_22.render(self.message, True, (0, 128, 0) if self.message == "Correct!" else (200, 0, 0))
+            msg_surface = font_22.render(self.message, True, (0, 128, 0) if self.message == "Solved!" else (200, 0, 0))
             msg_rect = msg_surface.get_rect(center=(1050, 600))
             self.screen.blit(msg_surface, msg_rect)
             
         pygame.display.flip()
         
-    def solve_puzzle(self):
-        """Solve 버튼 클릭 시 hint 가져오고 Solver 실행"""
-        def parse_hint(text):
-            return [int(x) for x in text.strip().split() if x.isdigit()]
-
-        # 힌트 parsing
-        self.row_hint = [parse_hint(b.get_value()) for b in self.row_hint_boxes]
-        self.col_hint = [parse_hint(b.get_value()) for b in self.col_hint_boxes]
+    def load_puzzle(self):
+        """파일 탐색기에서 .txt 파일 선택 후 퍼즐을 가져온다"""
+        pygame.display.iconify()
         
-        # 타이머 시작
-        self.start_time = pygame.time.get_ticks()
-        self.elapsed_time = 0
-        self.timer_running = True
+        file_path_holder = self.file_path_holder
+        def select_file():
+            root = tk.Tk()
+            root.withdraw()
+            
+            path = filedialog.askopenfilename(
+                title="Select the puzzle file.",
+                filetypes=[("Text Files", "*.txt")],
+                initialdir=os.getcwd()
+            )
+            root.destroy()
+            if path: file_path_holder["path"] = path
+        
+        t = threading.Thread(target=select_file, daemon=True)
+        t.start()
+        pygame.display.set_mode((1200, 900))
+        
+    def apply_file(self):
+        file_path = self.file_path_holder["path"]
+        print(file_path)
+        
+        if not file_path:
+            self.message = "File not selected."
+            self.message_timer = pygame.time.get_ticks()
+            return
 
-        # Solver 호출
-        self.solver.set_problem(self.row_hint, self.col_hint)
-        if self.solver.solve_problem(log=False):
-            self.message = "Solved!"
-        else:
-            self.message = "Cannot solve the problem."
-        self.board = self.solver.board
-        self.timer_running = False
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        row_hint = []
+        col_hint = []
+
+        row = False
+        for line in lines:
+            line = line.strip()
+            if line.startswith("Row:"):
+                row = True
+                continue
+            elif line.startswith("Col:"):
+                row = False
+                continue
+            else:
+                hint = list(line.split(' '))
+                if row: row_hint.append(hint)
+                else: col_hint.append(hint)
+        
+        self.update_board(len(row_hint), len(col_hint))
+        # 힌트 GUI에 반영
+        for i, hint in enumerate(row_hint):
+            if i < len(self.row_hint_boxes):
+                self.row_hint_boxes[i].text = ' '.join(hint)
+                self.row_hint_boxes[i].txt_surface = self.row_hint_boxes[i].font.render(self.row_hint_boxes[i].text, True, BLACK)
+        for j, hint in enumerate(col_hint):
+            if j < len(self.col_hint_boxes):
+                self.col_hint_boxes[j].text = '\n'.join(hint)
+                self.col_hint_boxes[j].txt_surface = self.col_hint_boxes[j].font.render(hint[0], True, BLACK)
+        
+        self.message = f"Puzzle ({len(row_hint)}x{len(col_hint)}) loaded."
+        self.message_timer = pygame.time.get_ticks()
+        
+    def solve_puzzle(self):
+        """Solve 버튼 클릭 시 hint를 가져오고 새로운 thread에서 Solver 실행"""
+        def solver_thread():
+            def parse_hint(text):
+                text = text.strip()
+                if not text: return [0]
+                return [int(x) for x in text.split() if x.isdigit()]
+
+            # 힌트 parsing
+            self.row_hint = [parse_hint(b.get_value()) for b in self.row_hint_boxes]
+            self.col_hint = [parse_hint(b.get_value()) for b in self.col_hint_boxes]
+            
+            # 타이머 시작
+            self.start_time = pygame.time.get_ticks()
+            self.elapsed_time = 0
+            self.timer_running = True
+
+            # Solver 호출
+            self.solver.set_problem(self.row_hint, self.col_hint)
+            if self.solver.solve_problem(log=False):
+                self.message = "Solved!"
+                self.difficulty_value = self.solver.difficulty
+            else:
+                self.message = "Cannot solve the problem."
+                
+            self.message_timer = pygame.time.get_ticks()
+            self.board = self.solver.board
+            self.timer_running = False
+        
+        threading.Thread(target=solver_thread, daemon=True).start()
 
     def handle_input(self, event):
         if event.type == pygame.KEYDOWN and self.active_input:
@@ -279,10 +361,12 @@ class SolverGUI:
         # 버튼 클릭
         for name, rect in self.buttons.items():
             if rect.collidepoint(pos):
-                if name == "Solve":
+                if name == "Load":
+                    self.load_puzzle()
+                elif name == "Solve":
                     self.solve_puzzle()
                 elif name == "Reset":
-                    self.update_board(self.rows, self.cols)
+                    self.board = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
                 elif name == "Back":
                     return "menu"
 
@@ -312,6 +396,9 @@ class SolverGUI:
         
         while running:
             self.draw_board()
+            if self.file_path_holder["path"]:
+                self.apply_file()
+                self.file_path_holder["path"] = None
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False

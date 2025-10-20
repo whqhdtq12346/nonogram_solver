@@ -1,5 +1,7 @@
 import pygame
 import sys
+import os
+from datetime import datetime
 from generator import NonogramGenerator
 
 # 기본 설정
@@ -63,7 +65,8 @@ class GeneratorGUI:
             "Solve": pygame.Rect(975, 350, BUTTON_WIDTH, BUTTON_HEIGHT),
             "Reset": pygame.Rect(975, 400, BUTTON_WIDTH, BUTTON_HEIGHT),
             "Check": pygame.Rect(975, 450, BUTTON_WIDTH, BUTTON_HEIGHT),
-            "Back": pygame.Rect(975, 500, BUTTON_WIDTH, BUTTON_HEIGHT),
+            "Save": pygame.Rect(975, 500, BUTTON_WIDTH, BUTTON_HEIGHT),
+            "Back": pygame.Rect(975, 550, BUTTON_WIDTH, BUTTON_HEIGHT),
         }
         
     def draw_inputs(self):
@@ -196,8 +199,8 @@ class GeneratorGUI:
             
         # 메시지
         if self.message and pygame.time.get_ticks() - self.message_timer < 3000:
-            msg_surface = font_22.render(self.message, True, (0, 128, 0) if self.message == "Correct!" else (200, 0, 0))
-            msg_rect = msg_surface.get_rect(center=(1050, 600))
+            msg_surface = font_22.render(self.message, True, (0, 128, 0) if "!" in self.message else (200, 0, 0))
+            msg_rect = msg_surface.get_rect(center=(1050, 650))
             self.screen.blit(msg_surface, msg_rect)
 
         pygame.display.flip()
@@ -207,12 +210,12 @@ class GeneratorGUI:
             rows = int(self.row_input) if self.row_input else self.rows
             cols = int(self.col_input) if self.col_input else self.cols
             if rows < 3 or cols < 3:
-                self.message = "Minimum size is 3x3!"
+                self.message = "Minimum size is 3x3."
                 self.message_timer = pygame.time.get_ticks()
                 return
             self.rows, self.cols = rows, cols
         except ValueError:
-            self.message = "Invalid input!"
+            self.message = "Invalid input."
             self.message_timer = pygame.time.get_ticks()
             return
         
@@ -272,8 +275,38 @@ class GeneratorGUI:
             self.user_board = [row[:] for row in self.solution]
             self.timer_running = False
         else:
-            self.message = "Incorrect!"
+            self.message = "Incorrect."
         self.message_timer = pygame.time.get_ticks()
+        
+    def save_as_txt(self):
+        if not self.row_hint or not self.col_hint:
+            self.message = "No puzzle to save."
+            self.message_timer = pygame.time.get_ticks()
+            return
+        
+        folder = "save"
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        
+        now = datetime.now()
+        filename = now.strftime("%Y%m%d_%H%M%S") + ".txt"
+        filepath = os.path.join(folder, filename)
+
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write("Row:\n")
+                for hint in self.row_hint:
+                    f.write(" ".join(str(num) for num in hint) + "\n")
+
+                f.write("Col:\n")
+                for hint in self.col_hint:
+                    f.write(" ".join(str(num) for num in hint) + "\n")
+            
+            self.message = f"Puzzle saved!"
+            self.message_timer = pygame.time.get_ticks()
+        except Exception as e:
+            self.message = f"Save failed."
+            self.message_timer = pygame.time.get_ticks()
     
     def handle_input(self, event):
         """키보드 입력 처리"""
@@ -305,6 +338,8 @@ class GeneratorGUI:
                     self.reset_board()
                 elif name == "Check":
                     self.check_answer()
+                elif name == "Save":
+                    self.save_as_txt()
                 elif name == "Back":
                     return "menu"
                 return
