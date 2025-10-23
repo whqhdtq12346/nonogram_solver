@@ -32,6 +32,9 @@ class NonogramSolver:
         if hint == [0]:
             return [-1 for _ in range(length)]
         
+        if line == [-1]*length:
+            return line
+        
         # 시작 또는 끝 부분에 [0]으로 인해 사라진 line이 있을 경우 그 부분을 제외
         start = 0
         while line[start] == -1:
@@ -205,6 +208,7 @@ class NonogramSolver:
             print("Fill line: col")
             self.print_board()
 
+        solvable = True
         # infer 단계
         while True:
             count += 1
@@ -217,7 +221,9 @@ class NonogramSolver:
                 
                 row = board[r]
                 self.row_solutions[r] = self._get_all_solutions(self.col_num, row_hint[r], row)
-                
+                if len(self.row_solutions[r]) == 0:
+                    solvable = False
+                    
                 temp = self._infer(row=True, index=r)
                 for c in range(self.col_num):
                     if temp[c] != row[c]:
@@ -232,6 +238,8 @@ class NonogramSolver:
                 
                 col = [board[r][c] for r in range(self.row_num)]
                 self.col_solutions[c] = self._get_all_solutions(self.row_num, col_hint[c], col)
+                if len(self.col_solutions[c]) == 0:
+                    solvable = False
                 
                 temp = self._infer(row=False, index=c)
                 for r in range(self.row_num):
@@ -251,7 +259,7 @@ class NonogramSolver:
                 self.row_solutions = None
                 self.col_solutions = None
                 return True
-            if prev_board == board:
+            if not solvable or prev_board == board:
                 print("Cannot solve the problem.")
                 self.difficulty = None
                 self.row_solutions = None

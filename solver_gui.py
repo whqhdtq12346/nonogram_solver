@@ -42,10 +42,13 @@ class InputBox:
                 self.text += '\n'
             elif event.key == pygame.K_BACKSPACE:
                 self.text = self.text[:-1]
-            elif event.key == pygame.K_SPACE and self.ori == 'vertical':
+            elif event.key == pygame.K_SPACE:
                 # 세로 힌트는 스페이스바 → 줄바꿈
-                self.text += '\n'
-            else:
+                if self.ori == 'vertical':
+                    self.text += '\n'
+                else:
+                    self.text += ' '
+            elif event.unicode.isdigit():
                 self.text += event.unicode
             self.txt_surface = self.font.render(self.text, True, BLACK)
 
@@ -322,7 +325,7 @@ class SolverGUI:
 
             # Solver 호출
             self.solver.set_problem(self.row_hint, self.col_hint)
-            if self.solver.solve_problem(log=False):
+            if self.solver.solve_problem(log=True):
                 self.message = "Solved!"
                 self.difficulty_value = self.solver.difficulty
             else:
@@ -367,6 +370,9 @@ class SolverGUI:
                     self.solve_puzzle()
                 elif name == "Reset":
                     self.board = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+                    self.elapsed_time = 0
+                    self.timer_running = False
+                    self.difficulty_value = None
                 elif name == "Back":
                     return "menu"
 

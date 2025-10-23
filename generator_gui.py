@@ -237,6 +237,7 @@ class GeneratorGUI:
         else: fill_ratio = 0.5
         
         self.message = "Generating puzzle..."
+        self.message_timer = pygame.time.get_ticks()
         pygame.display.flip()
         
         while True:
@@ -252,6 +253,7 @@ class GeneratorGUI:
                 break
                 
         # 타이머 시작
+        self.message = ""
         self.start_time = pygame.time.get_ticks()
         self.elapsed_time = 0
         self.timer_running = True
