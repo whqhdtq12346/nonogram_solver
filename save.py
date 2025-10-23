@@ -3,11 +3,11 @@ from solver import NonogramSolver
 import time
 import os
 
-os.makedirs("problem", exist_ok=True)
+os.makedirs("save", exist_ok=True)
 
 generator = NonogramGenerator(40, 40, 0.5)
 
-file_name = f"problem/puzzle3.txt"
+file_name = f"save/puzzle3.txt"
 for _ in range(1):
     generator.generate_solution()
     row_hint, col_hint = generator.get_hints()
